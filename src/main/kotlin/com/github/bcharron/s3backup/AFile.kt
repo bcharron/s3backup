@@ -10,6 +10,7 @@ data class AFile(
     val path: String,
     val relativePath: String,
     val size: Long,
+    val metadata: Map<String, String>
 ) {
     companion object {
 
@@ -20,7 +21,7 @@ data class AFile(
         ): AFile {
             val relative = fullPath.substring(commonPath.length).trimStart('/')
 
-            return AFile(fullPath, relative, size)
+            return AFile(fullPath, relative, size, emptyMap())
         }
     }
 

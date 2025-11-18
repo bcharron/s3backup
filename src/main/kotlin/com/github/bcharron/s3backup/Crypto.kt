@@ -40,6 +40,6 @@ class Crypto(
             }
         }
 
-        return AFile(tempFile.path, file.relativePath, tempFile.length())
+        return AFile(tempFile.path, file.relativePath, tempFile.length(), emptyMap())
     }
 }

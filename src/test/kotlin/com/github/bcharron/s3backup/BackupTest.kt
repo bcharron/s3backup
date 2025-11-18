@@ -84,11 +84,11 @@ class BackupTest {
             val fakeS3Client = mockk<S3Storage>()
             val fakeCrypto = mockk<Crypto>()
 
-            val mockBucketList = listOf(AFile("fake/path/resource/cert.asc", "resources/cert.asc", 500))
+            val mockBucketList = listOf(AFile("fake/path/resource/cert.asc", "resources/cert.asc", 500, emptyMap()))
 
             coEvery { fakeS3Client.listBucketFiles(any(), any()) } returns mockBucketList
             coEvery { fakeS3Client.upload(any(), any(), any()) } returns Unit
-            coEvery { fakeCrypto.encrypt(any()) } returns AFile("/tmp/tempfile", "resources/fakefile", 100)
+            coEvery { fakeCrypto.encrypt(any()) } returns AFile("/tmp/tempfile", "resources/fakefile", 100, emptyMap())
 
             val backup = Backup(fakeS3Client, "fakeBucket", fakeCrypto)
 

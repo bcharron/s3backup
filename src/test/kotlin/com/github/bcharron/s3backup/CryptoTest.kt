@@ -34,7 +34,7 @@ class CryptoTest {
 
         val crypto = Crypto(EXAMPLE_PUBLIC_KEY)
 
-        val inputFile = AFile(tempFile.path, tempFile.path, tempFile.length())
+        val inputFile = AFile(tempFile.path, tempFile.path, tempFile.length(), emptyMap())
         val outputFile = crypto.encrypt(inputFile)
 
         assertTrue(outputFile.size > 0)

@@ -2,6 +2,7 @@ package com.github.bcharron.s3backup
 
 import org.bouncycastle.openpgp.api.OpenPGPCertificate
 import java.io.File
+import java.security.MessageDigest
 
 class Backup(
     val storage: StorageProvider,
@@ -13,7 +14,17 @@ class Backup(
         // fun differences(entries: List<SyncEntry>) = entries.filter { it -> !it.hasRemoteFile() || !it.isSimilarSize() }
     }
 
+    val checksumService = ChecksumService()
+
     private val evaluator = SyncEvaluator(MAX_SIZE_RATIO_DIFFERENCE)
+
+    fun fileWithMetadata(file: AFile): AFile {
+        val checksum = checksumService.md5(file.path)
+
+        val metadata = mapOf("bc-checksum" to checksum)
+
+        return AFile(file.path, file.relativePath, file.size, metadata)
+    }
 
     suspend fun filesToSyncEntries(
         localFiles: List<AFile>,

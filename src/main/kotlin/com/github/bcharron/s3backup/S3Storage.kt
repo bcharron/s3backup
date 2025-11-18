@@ -10,8 +10,6 @@ class S3Storage private constructor(
     private val client: S3Client,
 ) : StorageProvider {
     companion object {
-        fun ensureTrailingSlash(s: String) = s.trimEnd('/').plus('/')
-
         suspend fun create(): S3Storage {
             val s3Client = S3Client.fromEnvironment { }
 
@@ -25,11 +23,13 @@ class S3Storage private constructor(
         bucketName: String,
     ) {
         println("  upload to s3://${bucketName}/${remotePath}")
+
         val req =
             PutObjectRequest {
                 bucket = bucketName
                 body = File(src.path).asByteStream()
                 key = remotePath
+                // metadata = src.customMetadata
             }
 
         client.putObject(req)
@@ -39,7 +39,7 @@ class S3Storage private constructor(
         bucketName: String,
         prefix: String,
     ): List<AFile> {
-        val cleanPrefix = ensureTrailingSlash(prefix)
+        val cleanPrefix = prefix.ensureTrailingSlash()
 
         val req =
             ListObjectsRequest {
