@@ -1,50 +1,122 @@
 package com.github.bcharron.s3backup
 
-import kotlin.io.path.createTempFile
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertDoesNotThrow
 import java.io.File
+import kotlin.io.path.createTempFile
+import kotlin.test.assertEquals
 
-class AFileTest {
+class SyncEvaluatorTest {
     @Test
-    @DisplayName("Size with less than 30% difference are similar")
+    @DisplayName("Size with less than X% difference are similar")
     fun isSimilarTest() {
-        val file1 = AFile.fromPath("/a/b/c.png", "/a/b", 100)
-        val file2 = AFile.fromPath("/a/b/c.png", "/a/b", 70)
+        val evaluator = SyncEvaluator(0.3)
 
-        assertTrue(file1.isSimilarSize(file2))
-        assertTrue(file2.isSimilarSize(file1))
+        val file1 = AFile.fromPath("/a/b/c.png", "/a/b", 100)
+        val file2 = AFile.fromPath("/a/b/c.png", "/a/b", 71)
+
+        assertTrue(evaluator.isSimilarSize(file1, file2))
+        assertTrue(evaluator.isSimilarSize(file2, file1))
     }
 
     @Test
-    @DisplayName("Size with more than 30% difference are not similar")
+    @DisplayName("Size with more than x% difference are not similar")
     fun isNotSimilarTest() {
+        val evaluator = SyncEvaluator(0.3)
+
         val file1 = AFile.fromPath("/a/b/c.png", "/a/b", 200)
         val file2 = AFile.fromPath("/a/b/c.png", "/a/b", 100)
 
-        assertFalse(file1.isSimilarSize(file2))
-        assertFalse(file2.isSimilarSize(file1))
+        assertFalse(evaluator.isSimilarSize(file1, file2))
+        assertFalse(evaluator.isSimilarSize(file2, file1))
     }
 
     @Test
-    @DisplayName("Encryption should succeed")
-    fun encryptFileTest() {
-        val tempFile = createTempFile(prefix = "testPlain", suffix = ".tmp").toFile()
+    @DisplayName("Doesn't cause division by zero")
+    fun divisionByZeroTest() {
+        val evaluator = SyncEvaluator(0.3)
 
-        tempFile.outputStream().use { out ->
-            val data = "Hello!".toByteArray()
-            out.write(data)
+        val file1 = AFile.fromPath("/a/b/c.png", "/a/b", 10)
+        val file2 = AFile.fromPath("/a/b/c.png", "/a/b", 0)
+
+        assertDoesNotThrow {
+            // 10 % 0 and 0 % 10
+            assertFalse(evaluator.isSimilarSize(file1, file2))
+            assertFalse(evaluator.isSimilarSize(file2, file1))
+
+            // 0 % 0
+            assertTrue(evaluator.isSimilarSize(file2, file2))
         }
+    }
 
-        val cert = File("src/test/resources/cert.asc").readText()
+    @Test
+    @DisplayName("Files not in bucket need to be uploaded")
+    fun needsUploadNoRemote() {
+        val evaluator = SyncEvaluator(0.3)
 
-        val inputFile = AFile(tempFile.path, tempFile.path, tempFile.length())
-        val outputFile = inputFile.encrypt(cert)
+        val file1 = AFile.fromPath("/a/b/c.png", "/a/b", 200)
+        val entry = SyncEntry(file1, null, null)
 
-        assertTrue(outputFile.size > 0)
+        assertTrue(evaluator.needsUpload(entry))
+    }
 
-        // tempFile.delete()
+    @Test
+    @DisplayName("Files with big size difference need to be uploaded")
+    fun needsUploadFilesDifferent() {
+        val evaluator = SyncEvaluator(0.3)
+
+        val file1 = AFile.fromPath("/a/b/c.png", "/a/b", 200)
+        val file2 = AFile.fromPath("/a/b/c.png", "/a/b", 100)
+        val entry = SyncEntry(file1, file2, null)
+
+        assertTrue(evaluator.needsUpload(entry))
+    }
+
+    @Test
+    @DisplayName("Files with the same size don't need to be uploaded")
+    fun noUploadNeededFilesSameSize() {
+        val evaluator = SyncEvaluator(0.3)
+
+        val file1 = AFile.fromPath("/a/b/c.png", "/a/b", 200)
+        val entry = SyncEntry(file1, file1, null)
+
+        assertFalse(evaluator.needsUpload(entry))
+    }
+
+    @Test
+    @DisplayName("Encrypted files with same size as remote don't need to be uploaded")
+    fun encryptedSizeMatches() {
+        val evaluator = SyncEvaluator(0.3)
+
+        val file1 = AFile.fromPath("/a/b/c.png", "/a/b", 1000)
+        val file2 = AFile.fromPath("/a/b/c.png", "/a/b", 200)
+        val file3 = AFile.fromPath("/a/b/c.png", "/a/b", 200)
+        val entry = SyncEntry(file1, file2, file3)
+
+        assertFalse(evaluator.needsUpload(entry))
+    }
+
+    @Test
+    @DisplayName("Encrypted files with different size need to be uploaded")
+    fun encryptedSizeDoesntMatch() {
+        val evaluator = SyncEvaluator(0.3)
+
+        val file1 = AFile.fromPath("/a/b/c.png", "/a/b", 100)
+        val file2 = AFile.fromPath("/a/b/c.png", "/a/b", 200)
+        val file3 = AFile.fromPath("/a/b/c.png", "/a/b", 100)
+        val entry = SyncEntry(file1, file2, file3)
+
+        assertTrue(evaluator.needsUpload(entry))
+    }
+
+    @Test
+    @DisplayName("200 should be converted to 0.2")
+    fun sizeKBTest() {
+        val file1 = AFile.fromPath("/a/b/c.png", "/a/b", 200)
+
+        assertEquals(file1.sizeKB(), "0.20")
     }
 }
